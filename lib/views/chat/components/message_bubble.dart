@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/message.dart';
+import '../../../models/user_profile.dart';
 import '../../../services/encrypt_service.dart';
 import 'message_timestamp.dart';
 
@@ -8,12 +9,14 @@ class MessageBubble extends StatelessWidget {
   final Message chatMessage;
   final bool isMe;
   final EncryptService encryptService;
+  final UserProfile author;
 
   const MessageBubble({
     Key? key,
     required this.chatMessage,
     required this.isMe,
     required this.encryptService,
+    required this.author,
   }) : super(key: key);
 
   @override
@@ -40,12 +43,13 @@ class MessageBubble extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    encryptService.decrypt(chatMessage.author),
+                    author.name, //encryptService.decrypt(chatMessage.author),
                     style: const TextStyle(fontSize: 13, color: Colors.white),
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    encryptService.decrypt(chatMessage.message),
+                    chatMessage
+                        .message, //encryptService.decrypt(chatMessage.message),
                     style: const TextStyle(fontSize: 16, color: Colors.white),
                   ),
                 ],
