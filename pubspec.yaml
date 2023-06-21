@@ -42,6 +42,8 @@ dependencies:
   firebase_analytics: ^10.4.2
   envied: ^0.3.0+3
   encrypt: ^5.0.1
+  uuid: ^3.0.7
+  collection: ^1.17.0
 
 dev_dependencies:
   flutter_test:

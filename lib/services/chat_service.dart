@@ -18,11 +18,41 @@ class ChatService {
 
   void sendMessage(String message, String author) {
     Message chatMessages = Message(
-      author: encryptService.encrypt(author),
+      author: author, // encryptService.encrypt(author),
       timestamp: Timestamp.now(),
-      message: encryptService.encrypt(message),
+      message: message, //encryptService.encrypt(message),
     );
 
     ff.collection('messages').add(chatMessages.toJson());
+  }
+
+  Future<DocumentReference> write({
+    required String collectionName,
+    required Map<String, dynamic> data,
+  }) async {
+    return await ff.collection(collectionName).add(data);
+  }
+
+  void writeAllData({
+    required String collectionName,
+    required List<Map<String, dynamic>> listData,
+  }) {
+    for (var data in listData) {
+      ff.collection(collectionName).add(data);
+    }
+  }
+
+  Stream<QuerySnapshot> readStream({
+    required String collectionName,
+    String? sortableField,
+    bool descending = false,
+  }) {
+    if (sortableField != null) {
+      return ff
+          .collection(collectionName)
+          .orderBy(sortableField, descending: descending)
+          .snapshots();
+    }
+    return ff.collection(collectionName).snapshots();
   }
 }

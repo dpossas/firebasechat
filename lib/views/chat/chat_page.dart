@@ -1,11 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_chat/core/utils/env.dart';
-import 'package:firebase_chat/services/encrypt_service.dart';
-import '../../services/chat_service.dart';
-import 'components/input_message.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/utils/env.dart';
+import '../../models/chat.dart';
 import '../../models/message.dart';
+import '../../models/user_profile.dart';
+import '../../services/chat_service.dart';
+import '../../services/encrypt_service.dart';
+import 'chat_view_model.dart';
+import 'components/input_message.dart';
 import 'components/message_bubble.dart';
 
 class ChatPage extends StatefulWidget {
@@ -16,6 +19,8 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
+  final _chatViewModel = ChatViewModel();
+
   final _encrypt = EncryptService(
     encryptKey: Env.encryptKey,
     encryptIV: Env.encryptIV,
@@ -24,15 +29,23 @@ class _ChatPageState extends State<ChatPage> {
 
   final TextEditingController messageEditingController =
       TextEditingController();
-  List<QueryDocumentSnapshot> messageList = [];
   final ScrollController scrollController = ScrollController();
 
   @override
   void initState() {
+    super.initState();
+
     _chatService = ChatService(
       ff: FirebaseFirestore.instance,
       encryptService: _encrypt,
     );
+  }
+
+  @override
+  void dispose() {
+    _chatViewModel.reset();
+
+    super.dispose();
   }
 
   @override
@@ -43,28 +56,34 @@ class _ChatPageState extends State<ChatPage> {
         centerTitle: true,
         backgroundColor: const Color(0XFF23272a),
         elevation: 1,
-        title: const Text('My.chat', style: TextStyle(fontSize: 16)),
+        title: Text(
+          _chatViewModel.chatTitle,
+          style: const TextStyle(fontSize: 16),
+        ),
       ),
       body: Stack(
         children: <Widget>[
           Column(
             children: <Widget>[
               Flexible(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: _chatService.getMessageList(),
-                  builder: (BuildContext context,
-                      AsyncSnapshot<QuerySnapshot> snapshot) {
+                child: StreamBuilder<DocumentSnapshot>(
+                  stream: _chatViewModel.messageList(),
+                  builder: (context, snapshot) {
                     if (snapshot.hasData) {
-                      messageList = snapshot.data!.docs;
+                      final chat = Chat.fromDocument(snapshot.requireData);
+                      final messageList = chat.messages;
+                      messageList
+                          .sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
                       if (messageList.isNotEmpty) {
                         return ListView.builder(
-                            padding: const EdgeInsets.all(10),
-                            itemCount: messageList.length,
-                            reverse: true,
-                            controller: scrollController,
-                            itemBuilder: (context, index) =>
-                                _buildItem(index, messageList[index]));
+                          padding: const EdgeInsets.all(10),
+                          itemCount: messageList.length,
+                          reverse: true,
+                          controller: scrollController,
+                          itemBuilder: (context, index) =>
+                              _buildItem(messageList[index]),
+                        );
                       } else {
                         return const Center(
                           child: Text(
@@ -100,7 +119,9 @@ class _ChatPageState extends State<ChatPage> {
   void sendMessage(String message) {
     if (message.isNotEmpty) {
       messageEditingController.clear();
-      _chatService.sendMessage(message.trim(), currentUser(context));
+
+      _chatViewModel.sendMessage(message);
+
       if (scrollController.hasClients) {
         scrollController.animateTo(0,
             duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
@@ -108,18 +129,14 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  currentUser(context) => ModalRoute.of(context)?.settings.arguments as String;
+  _buildItem(Message message) {
+    final isMe = message.author == _chatViewModel.currentUser.value!.uuid;
 
-  _buildItem(int index, DocumentSnapshot? documentSnapshot) {
-    if (documentSnapshot != null) {
-      final chatMessage = Message.fromDocument(documentSnapshot);
-      final isMe = _encrypt.decrypt(chatMessage.author) == currentUser(context);
-
-      return MessageBubble(
-        chatMessage: chatMessage,
-        isMe: isMe,
-        encryptService: _encrypt,
-      );
-    }
+    return MessageBubble(
+      chatMessage: message,
+      isMe: isMe,
+      encryptService: _encrypt,
+      author: _chatViewModel.getUserById(message.author),
+    );
   }
 }
